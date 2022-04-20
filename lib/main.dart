@@ -26,9 +26,16 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
+  String? _selectedDirectory;
+
+  List<String> soundFilesPaths = [];
+  List<String> supportedFormat = ['mp3', 'wav', 'flac', 'ogg', 'm4a'];
+
   final Player _player = Player(id: 69420);
+  String playingFile = '';
+  double _volume = 0.3;
+  bool _mute = false;
   double _currentPosition = 0;
-  String _mediaFileName = '';
 
   final List<LogicalKeyboardKey> availableKeys = [
     LogicalKeyboardKey.keyA,
@@ -48,7 +55,6 @@ class _HomeState extends State<Home> {
   ];
 
   final FocusNode keyAreaFocusNode = FocusNode();
-  final FocusNode progressBarFocusNode = FocusNode();
 
   final List<Map<Duration, String>> _pressedKeys = [];
   final ScrollController _keyScrollController = ScrollController();
@@ -58,6 +64,8 @@ class _HomeState extends State<Home> {
   @override
   void initState() {
     super.initState();
+
+    _player.setVolume(_volume);
 
     _player.positionStream.listen((positionState) {
       if (positionState.position != null) {
@@ -74,17 +82,83 @@ class _HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          buildPressedKeyList(context),
-          buildKeyContainers(),
-          buildPlaybackButtons(),
-          buildProgressBar(),
-        ],
+    return RawKeyboardListener(
+      focusNode: keyAreaFocusNode,
+      autofocus: true,
+      onKey: (rawkeyEvent) {
+        if (_player.playback.isPlaying) {
+          for (var keyboardKey in availableKeys) {
+            if (rawkeyEvent.isKeyPressed(keyboardKey)) {
+              Map<Duration, String> map = {
+                Duration(milliseconds: _currentPosition.toInt()):
+                    rawkeyEvent.logicalKey.keyLabel,
+              };
+
+              _pressedKeys.add(map);
+              _keyStreamController.add(map);
+              _keyScrollController
+                  .jumpTo(_keyScrollController.position.maxScrollExtent);
+            }
+          }
+        }
+      },
+      child: Scaffold(
+        body: GestureDetector(
+          onTap: () => keyAreaFocusNode.requestFocus(),
+          child: Column(
+            children: [
+              Flexible(
+                child: soundFilesPaths.isEmpty
+                    ? Center(
+                        child: TextButton(
+                            onPressed: () => pickMusicFolder(),
+                            child: Text("Pick a music folder")),
+                      )
+                    : ListView.builder(
+                        itemCount: soundFilesPaths.length,
+                        itemBuilder: (context, index) {
+                          return ListTile(
+                              leading: Icon(Icons.music_note),
+                              title: Text(Platform.isWindows
+                                  ? soundFilesPaths[index].split('\\').last
+                                  : soundFilesPaths[index].split('/').last),
+                              tileColor: playingFile == soundFilesPaths[index]
+                                  ? Colors.green
+                                  : Colors.transparent,
+                              onTap: () {
+                                playingFile = soundFilesPaths[index];
+
+                                File file = File(soundFilesPaths[index]);
+                                Media media0 = Media.file(file);
+                                _player.open(media0);
+                                _player.play();
+                                setState(() {});
+                              });
+                        },
+                      ),
+              ),
+              buildPressedKeyList(context),
+              buildPlaybackButtons(),
+              buildProgressBar(),
+            ],
+          ),
+        ),
+        floatingActionButton: FloatingActionButton(
+          child: Icon(Icons.clear),
+          onPressed: () => setState(
+            () => _pressedKeys.clear(),
+          ),
+        ),
       ),
-      floatingActionButton: buildFab(context),
     );
+  }
+
+  @override
+  void dispose() {
+    _keyStreamController.close();
+    _keyScrollController.dispose();
+    keyAreaFocusNode.dispose();
+    super.dispose();
   }
 
   SizedBox buildPressedKeyList(BuildContext context) {
@@ -135,51 +209,6 @@ class _HomeState extends State<Home> {
     );
   }
 
-  Widget buildKeyContainers() {
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => keyAreaFocusNode.requestFocus(),
-        child: RawKeyboardListener(
-          focusNode: keyAreaFocusNode,
-          autofocus: true,
-          onKey: (rawkeyEvent) {
-            if (_player.playback.isPlaying) {
-              for (var keyboardKey in availableKeys) {
-                if (rawkeyEvent.isKeyPressed(keyboardKey)) {
-                  Map<Duration, String> map = {
-                    Duration(milliseconds: _currentPosition.toInt()):
-                        rawkeyEvent.logicalKey.keyLabel,
-                  };
-
-                  _pressedKeys.add(map);
-                  _keyStreamController.add(map);
-                  _keyScrollController
-                      .jumpTo(_keyScrollController.position.maxScrollExtent);
-                }
-              }
-            }
-          },
-          child: Row(
-            children: List.generate(availableKeys.length, (index) {
-              return Expanded(
-                child: Container(
-                  height: double.infinity,
-                  color: keyBgColors[index],
-                  child: Center(
-                    child: Text(
-                      availableKeys[index].keyLabel,
-                      style: TextStyle(fontSize: 100),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
-      ),
-    );
-  }
-
   StreamBuilder<PlaybackState> buildPlaybackButtons() {
     return StreamBuilder(
       stream: _player.playbackStream,
@@ -192,11 +221,6 @@ class _HomeState extends State<Home> {
         return Row(
           children: [
             SizedBox(width: 8),
-            Text(
-              playbackState == null ? '' : _mediaFileName,
-              style: TextStyle(fontSize: 20),
-            ),
-            SizedBox(width: 16),
             IconButton(
               onPressed: playbackState == null
                   ? null
@@ -209,11 +233,25 @@ class _HomeState extends State<Home> {
             ),
             SizedBox(width: 16),
             IconButton(
-              onPressed: () {
-                print(_pressedKeys);
-              },
-              icon: Icon(Icons.volume_up_sharp),
+              onPressed: () => setState(() {
+                _mute = !_mute;
+
+                _mute ? _player.setVolume(0) : _player.setVolume(_volume);
+              }),
+              icon:
+                  Icon(_mute ? Icons.volume_off_sharp : Icons.volume_up_sharp),
             ),
+            Slider(
+              value: _volume,
+              min: 0,
+              max: 1,
+              onChanged: (value) {
+                _player.setVolume(value);
+                _volume = value;
+                setState(() {});
+              },
+            ),
+            Text((_volume * 100.0).toStringAsFixed(0) + '%'),
           ],
         );
       },
@@ -228,7 +266,6 @@ class _HomeState extends State<Home> {
           final positionState = snapshot.data as PositionState;
           if (positionState.position != null) {
             return Slider(
-              focusNode: progressBarFocusNode,
               value: _currentPosition,
               min: 0,
               max: positionState.duration!.inMilliseconds.toDouble(),
@@ -247,23 +284,38 @@ class _HomeState extends State<Home> {
     );
   }
 
-  FloatingActionButton buildFab(BuildContext context) {
-    return FloatingActionButton(
-      child: Icon(Icons.music_note),
-      onPressed: () async {
-        FilePickerResult? result =
-            await FilePicker.platform.pickFiles(type: FileType.audio);
-
-        if (result != null) {
-          File file = File(result.files.single.path!);
-          _mediaFileName = file.path.split('\\').last;
-
-          Media media0 = Media.file(file);
-          _player.open(media0);
-          _player.play();
-        }
-      },
+  Future<void> pickMusicFolder() async {
+    _selectedDirectory = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: "Select folder where you store your music files",
+      lockParentWindow: true,
     );
+
+    if (_selectedDirectory != null) {
+      soundFilesPaths.clear();
+      Directory directory = Directory(_selectedDirectory!);
+      await _fetchFiles(directory);
+      setState(() {});
+    }
+  }
+
+  _fetchFiles(Directory directory) async {
+    final List<FileSystemEntity> entities = await directory.list().toList();
+
+    for (var item in entities) {
+      if (item is Directory) {
+        _fetchFiles(item);
+      } else if (item is File) {
+        final String fileName = item.path.split('/').last;
+        final String fileExtension = fileName.split('.').last.toLowerCase();
+
+        if (supportedFormat.contains(fileExtension)) {
+          if (!soundFilesPaths.contains(fileName)) {
+            soundFilesPaths.add(item.path);
+          }
+        }
+      }
+    }
+    setState(() {});
   }
 
   Future<void> saveFile() async {
@@ -271,7 +323,9 @@ class _HomeState extends State<Home> {
 
     Directory appDocDir = await getApplicationDocumentsDirectory();
     String appDocPath = appDocDir.path;
-    List<Map<int, String>> list = [];
+    List<Map<String, dynamic>> list = [];
+
+    list.add({"file": playingFile});
 
     for (var item in _pressedKeys) {
       final duration = item.keys.first;
@@ -279,16 +333,26 @@ class _HomeState extends State<Home> {
       final key = duration.inMilliseconds;
       final keyName = item.values.first;
 
-      Map<int, String> map = {key: keyName};
+      Map<String, int> map = {keyName: key};
       list.add(map);
     }
 
-    String fileName =
+    String songName = Platform.isWindows
+        ? playingFile.split('\\').last.split('.').first
+        : playingFile.split('/').last.split('.').first;
+
+    String fileName = songName +
+        " " +
         DateTime.now().toString().replaceAll(':', '-').split('.')[0];
 
-    File file = await File('$appDocPath\\flutter_game_prototype\\$fileName.txt')
-        .create(recursive: true);
+    File file =
+        await File('$appDocPath\\flutter_game_prototype\\$fileName.json')
+            .create(recursive: true);
 
-    file.writeAsString(list.toString()).then((_) => _pressedKeys.clear());
+    // await file.writeAsString(list.toString()).then((_) => _pressedKeys.clear());
+    await file
+        .writeAsString(jsonEncode(list))
+        .then((_) => _pressedKeys.clear());
+    setState(() {});
   }
 }
