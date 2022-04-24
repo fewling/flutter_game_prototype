@@ -69,9 +69,7 @@ class _BeatRecorderState extends State<BeatRecorder> {
     });
 
     _player.playbackStream.listen((event) {
-      if (event.isCompleted) {
-        saveFile();
-      }
+      if (event.isCompleted) saveFile();
     });
   }
 
@@ -230,9 +228,7 @@ class _BeatRecorderState extends State<BeatRecorder> {
       stream: _player.playbackStream,
       builder: (context, snapshot) {
         PlaybackState? playbackState;
-        if (snapshot.hasData) {
-          playbackState = snapshot.data;
-        }
+        if (snapshot.hasData) playbackState = snapshot.data;
 
         return Row(
           children: [
@@ -284,7 +280,7 @@ class _BeatRecorderState extends State<BeatRecorder> {
             return Slider(
               value: _currentPosition,
               min: 0,
-              max: positionState.duration!.inMilliseconds.toDouble(),
+              max: positionState.duration!.inMilliseconds.toDouble() + 1.0,
               onChanged: (value) async {
                 _currentPosition = value;
                 setState(() {});
