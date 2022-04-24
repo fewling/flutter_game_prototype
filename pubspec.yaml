@@ -38,6 +38,7 @@ dependencies:
   dart_vlc: ^0.1.9
   path_provider: ^2.0.9
   flutter_countdown_timer: ^4.1.0
+  intl: ^0.17.0
 
 dev_dependencies:
   flutter_test:

@@ -7,6 +7,7 @@ import 'dart:math';
 import 'package:dart_vlc/dart_vlc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_countdown_timer/flutter_countdown_timer.dart';
+import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 
 class Game extends StatefulWidget {
@@ -252,10 +253,28 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
                 if (_player.position.position != null && !value.isNaN) {
                   return LinearProgressIndicator(value: value);
                 } else {
-                  return LinearProgressIndicator(value: 0.5);
+                  return LinearProgressIndicator(value: 0);
                 }
               }),
         ),
+        Expanded(
+            flex: 1,
+            child: Center(
+              child: StreamBuilder<PositionState>(
+                  stream: _player.positionStream,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData) {
+                      final df = DateFormat('mm:ss');
+                      final position = snapshot.data!.position!.inMilliseconds;
+                      String elapsed = df.format(
+                          DateTime.fromMillisecondsSinceEpoch(position));
+
+                      return Text(elapsed);
+                    } else {
+                      return Text('0:00');
+                    }
+                  }),
+            )),
         Expanded(
           flex: 1,
           child: IconButton(
