@@ -1,5 +1,6 @@
 // ignore_for_file: prefer_const_constructors
 
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
@@ -21,6 +22,7 @@ class Game extends StatefulWidget {
 
 class _GameState extends State<Game> with SingleTickerProviderStateMixin {
   late Future<Directory> _savesDirFuture;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   final Player _player = Player(id: 69420);
 
@@ -55,6 +57,13 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
 
   final FocusNode _focusNode = FocusNode();
 
+  final LinkedHashMap<String, int> scores = {
+    "perfect": 0,
+    "good": 0,
+    "bad": 0,
+    "missed": 0,
+  } as LinkedHashMap<String, int>;
+
   @override
   void initState() {
     _controller =
@@ -63,6 +72,12 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
 
     _player.setVolume(_volume);
     _savesDirFuture = getApplicationDocumentsDirectory();
+
+    _player.playbackStream.listen((event) {
+      if (event.isCompleted) {
+        // TODO: handle end of level
+      }
+    });
 
     super.initState();
   }
@@ -88,11 +103,11 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
                 double remainedDist = brick.remainingDist() / brick.totalDist;
 
                 if (remainedDist >= 0.08 && remainedDist <= 0.2) {
-                  brick.result = 'perfect';
+                  scores['perfect'] = scores['perfect']! + 1;
                 } else if (remainedDist > 0.2 && remainedDist <= 0.3) {
-                  brick.result = 'good';
+                  scores['good'] = scores['good']! + 1;
                 } else {
-                  brick.result = 'bad';
+                  scores['bad'] = scores['bad']! + 1;
                 }
                 print('$remainedDist ${brick.result}');
                 _drawingBricks.removeAt(i);
@@ -103,6 +118,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
         }
       },
       child: Scaffold(
+        key: _scaffoldKey,
         appBar: _buildAppbar(),
         endDrawer: _buildEndDrawer(_screenWidth),
         body: _buildBodies(),
@@ -122,6 +138,12 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
       leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: Icon(Icons.arrow_back_ios_new_outlined)),
+      actions: [
+        IconButton(
+          icon: Icon(Icons.playlist_play_sharp),
+          onPressed: () => _scaffoldKey.currentState!.openEndDrawer(),
+        ),
+      ],
     );
   }
 
@@ -256,8 +278,9 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
     } else {
       return Column(
         children: [
-          Expanded(child: _buildPainter()),
+          Expanded(child: _buildGame()),
           _buildKeyboard(),
+          SizedBox(height: 20),
           _buildBottom(),
         ],
       );
@@ -275,9 +298,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
               child: Text(
                 availableKeys[index].keyLabel,
                 style: TextStyle(
-                    fontFamily: "Roboto",
-                    fontSize: _screenWidth * 0.03,
-                    color: Colors.white),
+                    fontSize: _screenWidth * 0.03, color: Colors.white),
               ),
             ),
           ),
@@ -286,17 +307,15 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
     );
   }
 
-  Widget _buildPainter() {
+  Widget _buildGame() {
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
         return Stack(
           children: [
-            Container(
-              constraints: BoxConstraints.expand(),
-              color: Colors.grey[800],
-            ),
-            ..._updateDrawingBricks(),
+            ..._buildFallingBricks(),
+
+            /// Draw the detination line indicator:
             Positioned(
               bottom: _screenHeight * 0.05,
               child: Container(
@@ -305,13 +324,35 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
                 width: _screenWidth,
               ),
             ),
+
+            /// Draw the score:
+            Positioned(
+              top: _screenHeight * 0.02,
+              right: _screenWidth * 0.02,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: List.generate(
+                  scores.length,
+                  (index) {
+                    String key = scores.keys.elementAt(index);
+                    return Row(
+                      children: [
+                        Text("$key x "),
+                        SizedBox(width: 5),
+                        Text(scores[key].toString()),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
           ],
         );
       },
     );
   }
 
-  List<Widget> _updateDrawingBricks() {
+  List<Widget> _buildFallingBricks() {
     /// Extract bricks that should be drawn base on music position:
     /// Then remove the extracted bricks from allBrick list.
     int counter = 0;
@@ -327,11 +368,16 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
     _allBricks.removeRange(0, counter);
 
     /// Remove bricks that are out of screen:
-    counter = 0;
+    List<Brick> bricksToRemove = [];
     for (var item in _drawingBricks) {
-      if (item.isOutOfScreen) counter += 1;
+      if (item.isOutOfScreen) {
+        bricksToRemove.add(item);
+        scores['missed'] = scores['missed']! + 1;
+      }
     }
-    _drawingBricks.removeRange(0, counter);
+    for (var element in bricksToRemove) {
+      _drawingBricks.remove(element);
+    }
 
     /// Make bricks fall:
     for (var brick in _drawingBricks) {
@@ -369,6 +415,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
               child: _player.playback.isPlaying
                   ? Icon(Icons.replay)
                   : Icon(Icons.play_arrow),
+              style: TextButton.styleFrom(primary: Colors.white),
             )),
         Expanded(
             flex: 1,
@@ -399,6 +446,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
               _mute ? _player.setVolume(0) : _player.setVolume(_volume);
             }),
             child: Icon(_mute ? Icons.volume_off_sharp : Icons.volume_up_sharp),
+            style: TextButton.styleFrom(primary: Colors.white),
           ),
         ),
       ],

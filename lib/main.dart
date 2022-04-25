@@ -11,7 +11,7 @@ void main() {
     home: Home(),
     theme: ThemeData(
       brightness: Brightness.dark,
-      fontFamily: "PermanentMarker",
+      fontFamily: "PressStart2P",
     ),
     debugShowCheckedModeBanner: false,
   ));
@@ -23,7 +23,7 @@ class Home extends StatelessWidget {
   final menuButtonStyle = TextButton.styleFrom().copyWith(
     backgroundColor: MaterialStateProperty.resolveWith<Color?>(
       (states) => states.contains(MaterialState.hovered)
-          ? Colors.blue[800]
+          ? Colors.deepPurple[600]
           : Colors.transparent,
     ),
     shape: MaterialStateProperty.resolveWith<OutlinedBorder?>(
@@ -52,8 +52,11 @@ class Home extends StatelessWidget {
             Column(
               children: [
                 TextButton(
-                  child: Text('Play',
-                      style: Theme.of(context).textTheme.headline2),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text('Play',
+                        style: Theme.of(context).textTheme.headline2),
+                  ),
                   style: menuButtonStyle,
                   onPressed: () {
                     Navigator.push(
@@ -64,9 +67,13 @@ class Home extends StatelessWidget {
                     );
                   },
                 ),
+                SizedBox(height: 24),
                 TextButton(
-                  child: Text('Create',
-                      style: Theme.of(context).textTheme.headline2),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text('Create',
+                        style: Theme.of(context).textTheme.headline2),
+                  ),
                   style: menuButtonStyle,
                   onPressed: () {
                     Navigator.push(
