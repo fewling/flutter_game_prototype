@@ -75,6 +75,10 @@ flutter:
       fonts:
         - asset: fonts/Roboto-Regular.ttf
           weight: 400
+    - family: PressStart2P
+      fonts:
+        - asset: fonts/PressStart2P-Regular.ttf
+          weight: 400
     # - family: Schyler
     #   fonts:
     #     - asset: fonts/Schyler-Regular.ttf

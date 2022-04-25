@@ -1,4 +1,4 @@
-// ignore_for_file: prefer_const_constructors
+// ignore_for_file: prefer_const_constructors, prefer_const_literals_to_create_immutables
 
 import 'dart:collection';
 import 'dart:convert';
@@ -27,7 +27,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
   final Player _player = Player(id: 69420);
 
   Map<String, dynamic> _selectedJson = {};
-  double _volume = 0.3;
+  final double _volume = 0.3;
   bool _mute = false;
 
   final List<Brick> _allBricks = [];
@@ -64,6 +64,25 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
     "missed": 0,
   } as LinkedHashMap<String, int>;
 
+  final double gravity = 0.1;
+  final double boost = 0.8;
+  final Map<String, double> _keyVelocities = {
+    "A": -0.1,
+    "S": -0.1,
+    "D": -0.1,
+    "J": -0.1,
+    "K": -0.1,
+    "L": -0.1,
+  };
+  final Map<String, double> _keyProgresses = {
+    "A": 0,
+    "S": 0,
+    "D": 0,
+    "J": 0,
+    "K": 0,
+    "L": 0,
+  };
+
   @override
   void initState() {
     _controller =
@@ -95,7 +114,9 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
         for (var keyboardKey in availableKeys) {
           if (keyEvent.isKeyPressed(keyboardKey)) {
             String label = keyboardKey.keyLabel.toUpperCase();
+            _keyVelocities[label] = _keyVelocities[label]! + boost;
 
+            print(_keyVelocities);
             for (var i = 0; i < _drawingBricks.length; i++) {
               Brick brick = _drawingBricks[i];
 
@@ -109,7 +130,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
                 } else {
                   scores['bad'] = scores['bad']! + 1;
                 }
-                print('$remainedDist ${brick.result}');
+                // print('$remainedDist ${brick.result}');
                 _drawingBricks.removeAt(i);
                 break;
               }
@@ -288,23 +309,56 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
   }
 
   Widget _buildKeyboard() {
-    return Row(
-      children: List.generate(
-        availableKeys.length,
-        (index) => Expanded(
-          child: Container(
-            color: Colors.transparent,
-            child: Center(
-              child: Text(
-                availableKeys[index].keyLabel,
-                style: TextStyle(
-                    fontSize: _screenWidth * 0.03, color: Colors.white),
-              ),
+    return AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return Row(
+            children: List.generate(
+              availableKeys.length,
+              (index) {
+                String key = availableKeys[index].keyLabel;
+
+                _keyVelocities[key] = _keyVelocities[key]! - gravity;
+                _keyProgresses[key] =
+                    _keyProgresses[key]! + _keyVelocities[key]!;
+
+                // constrain progress between 0 ~ 1:
+                if (_keyProgresses[key]! > 1) {
+                  _keyProgresses[key] = 1;
+                } else if (_keyProgresses[key]! < 0) {
+                  _keyProgresses[key] = 0;
+                }
+
+                if (_keyVelocities[key]! > 1) {
+                  _keyVelocities[key] = 1;
+                } else if (_keyVelocities[key]! < -0.1) {
+                  _keyVelocities[key] = -0.1;
+                }
+
+                return Expanded(
+                  child: Center(
+                    child: ShaderMask(
+                      shaderCallback: (Rect bounds) => LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [Colors.red, Colors.white],
+                        stops: [
+                          _keyProgresses[availableKeys[index].keyLabel]!,
+                          0.0
+                        ],
+                      ).createShader(bounds),
+                      child: Text(
+                        availableKeys[index].keyLabel,
+                        style: TextStyle(
+                            fontSize: _screenWidth * 0.03, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
-          ),
-        ),
-      ),
-    );
+          );
+        });
   }
 
   Widget _buildGame() {
