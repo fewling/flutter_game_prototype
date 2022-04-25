@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_const_constructors
+
 import 'package:flutter/material.dart';
 
 import 'brick.dart';
@@ -14,11 +16,11 @@ class BrickPainter extends CustomPainter {
     paint.color = Colors.red;
     paint.strokeWidth = 3;
 
-    double lineY = size.height * 0.9;
-    canvas.drawLine(Offset(0, lineY), Offset(size.width, lineY), paint);
+    canvas.drawLine(
+        Offset(0, size.height), Offset(size.width, size.height), paint);
 
     for (var brick in _bricks) {
-      brick.fallTo(lineY);
+      brick.fallTo(size.height);
       final rect = Rect.fromLTWH(brick.x, brick.y, brick.width, brick.height);
       canvas.drawRect(rect, paint);
     }

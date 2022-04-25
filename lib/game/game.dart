@@ -40,10 +40,37 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
   final String stageGame = "game";
 
   int _countdownEndTime = 0;
-  final int _countdownInterval = 5000;
+  final int _countdownInterval = 1000;
 
   double _screenWidth = 0;
   double _screenHeight = 0;
+
+  List<Map> keysAndColors = [
+    {
+      "key": "A",
+      "color": Color(0xFF5B4DB7),
+    },
+    {
+      "key": "S",
+      "color": Color(0xFF42ADC7),
+    },
+    {
+      "key": "D",
+      "color": Color(0xFF81D152),
+    },
+    {
+      "key": "J",
+      "color": Color(0xFFF5F263),
+    },
+    {
+      "key": "K",
+      "color": Color(0xFFFF9D4F),
+    },
+    {
+      "key": "L",
+      "color": Color(0xFFFF5347),
+    },
+  ];
 
   @override
   void initState() {
@@ -194,10 +221,33 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
       return Column(
         children: [
           Expanded(child: buildPainter()),
+          buildKeyboard(),
           buildBottom(),
         ],
       );
     }
+  }
+
+  Widget buildKeyboard() {
+    return Row(
+      children: List.generate(
+        6,
+        (index) => Expanded(
+          child: Container(
+            color: keysAndColors[index]['color'],
+            child: Center(
+              child: Text(
+                keysAndColors[index]['key'],
+                style: TextStyle(
+                    fontFamily: "Roboto",
+                    fontSize: _screenWidth * 0.03,
+                    color: Colors.white),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget buildPainter() {
@@ -229,10 +279,11 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
         _drawingBricks.removeRange(0, counter);
 
         return CustomPaint(
-          painter: BrickPainter(_drawingBricks),
-          child: Container(constraints: BoxConstraints.expand()),
+          foregroundPainter: BrickPainter(_drawingBricks),
+          child: child,
         );
       },
+      child: Container(constraints: BoxConstraints.expand()),
     );
   }
 
