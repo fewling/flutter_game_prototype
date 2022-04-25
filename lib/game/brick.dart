@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 class Brick {
   final String content;
   final int position;
-  final double x;
   double y;
   final double width;
   final double height;
@@ -11,10 +10,11 @@ class Brick {
 
   final double fallTime = 1000;
 
+  bool isOutOfScreen = false;
+
   Brick(
     this.content,
     this.position,
-    this.x,
     this.y,
     this.width,
     this.height,
@@ -29,5 +29,7 @@ class Brick {
     /// where 30 = 60fps * (falltime / 1000ms)
     double velocity = destination / (60 * (fallTime / 1000));
     y += velocity;
+
+    if (y >= destination) isOutOfScreen = true;
   }
 }

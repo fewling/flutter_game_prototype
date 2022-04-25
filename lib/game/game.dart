@@ -179,9 +179,8 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
     for (var item in pressedKeys) {
       String key = item.keys.first;
       int pos = item.values.first;
-      double x = Random().nextDouble() * screenWidth;
 
-      final brick = Brick(key, pos, x, 0, screenWidth * 0.1, 20, Colors.red);
+      final brick = Brick(key, pos, 0, screenWidth * 0.1, 20, Colors.red);
       _allBricks.add(brick);
     }
   }
@@ -272,14 +271,12 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
         /// Remove bricks that are out of screen:
         counter = 0;
         for (var item in _drawingBricks) {
-          if (item.y > _screenHeight) {
-            counter += 1;
-          }
+          if (item.isOutOfScreen) counter += 1;
         }
         _drawingBricks.removeRange(0, counter);
 
         return CustomPaint(
-          foregroundPainter: BrickPainter(_drawingBricks),
+          painter: BrickPainter(_drawingBricks),
           child: child,
         );
       },
