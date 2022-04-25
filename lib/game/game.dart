@@ -2,16 +2,15 @@
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:dart_vlc/dart_vlc.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_countdown_timer/flutter_countdown_timer.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'brick.dart';
-import 'brick_painter.dart';
 
 class Game extends StatefulWidget {
   const Game({Key? key}) : super(key: key);
@@ -45,32 +44,16 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
   double _screenWidth = 0;
   double _screenHeight = 0;
 
-  List<Map> keysAndColors = [
-    {
-      "key": "A",
-      "color": Color(0xFF5B4DB7),
-    },
-    {
-      "key": "S",
-      "color": Color(0xFF42ADC7),
-    },
-    {
-      "key": "D",
-      "color": Color(0xFF81D152),
-    },
-    {
-      "key": "J",
-      "color": Color(0xFFF5F263),
-    },
-    {
-      "key": "K",
-      "color": Color(0xFFFF9D4F),
-    },
-    {
-      "key": "L",
-      "color": Color(0xFFFF5347),
-    },
+  final List<LogicalKeyboardKey> availableKeys = [
+    LogicalKeyboardKey.keyA,
+    LogicalKeyboardKey.keyS,
+    LogicalKeyboardKey.keyD,
+    LogicalKeyboardKey.keyJ,
+    LogicalKeyboardKey.keyK,
+    LogicalKeyboardKey.keyL,
   ];
+
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -88,11 +71,42 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     _screenWidth = MediaQuery.of(context).size.width;
     _screenHeight = MediaQuery.of(context).size.height;
+    _focusNode.requestFocus();
 
-    return Scaffold(
-      appBar: buildAppbar(),
-      endDrawer: buildEndDrawer(_screenWidth),
-      body: buildBodies(),
+    return RawKeyboardListener(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKey: (keyEvent) {
+        for (var keyboardKey in availableKeys) {
+          if (keyEvent.isKeyPressed(keyboardKey)) {
+            String label = keyboardKey.keyLabel.toUpperCase();
+
+            for (var i = 0; i < _drawingBricks.length; i++) {
+              Brick brick = _drawingBricks[i];
+
+              if (brick.content == label) {
+                double remainedDist = brick.remainingDist() / brick.totalDist;
+
+                if (remainedDist >= 0.08 && remainedDist <= 0.2) {
+                  brick.result = 'perfect';
+                } else if (remainedDist > 0.2 && remainedDist <= 0.3) {
+                  brick.result = 'good';
+                } else {
+                  brick.result = 'bad';
+                }
+                print('$remainedDist ${brick.result}');
+                _drawingBricks.removeAt(i);
+                break;
+              }
+            }
+          }
+        }
+      },
+      child: Scaffold(
+        appBar: _buildAppbar(),
+        endDrawer: _buildEndDrawer(_screenWidth),
+        body: _buildBodies(),
+      ),
     );
   }
 
@@ -103,7 +117,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  PreferredSizeWidget buildAppbar() {
+  PreferredSizeWidget _buildAppbar() {
     return AppBar(
       leading: IconButton(
           onPressed: () => Navigator.pop(context),
@@ -111,7 +125,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
     );
   }
 
-  Drawer buildEndDrawer(double screenWidth) {
+  Drawer _buildEndDrawer(double screenWidth) {
     return Drawer(
       child: FutureBuilder<Directory>(
           future: _savesDirFuture,
@@ -153,7 +167,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
                       _selectedJson = json;
                       setState(() {});
 
-                      prepareBricks(screenWidth);
+                      _prepareAllBricks(screenWidth);
 
                       /// Load music:
                       File file = File(filePath);
@@ -173,19 +187,42 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
     );
   }
 
-  void prepareBricks(double screenWidth) {
+  void _prepareAllBricks(double screenWidth) {
     _allBricks.clear();
     List pressedKeys = _selectedJson['pressed_keys'];
     for (var item in pressedKeys) {
       String key = item.keys.first;
       int pos = item.values.first;
 
-      final brick = Brick(key, pos, 0, screenWidth * 0.1, 20, Colors.red);
+      double x = 0;
+      switch (key) {
+        case 'A':
+          x = 0;
+          break;
+        case 'S':
+          x = _screenWidth / 6;
+          break;
+        case 'D':
+          x = _screenWidth / 6 * 2;
+          break;
+        case 'J':
+          x = _screenWidth / 6 * 3;
+          break;
+        case 'K':
+          x = _screenWidth / 6 * 4;
+          break;
+        case 'L':
+          x = _screenWidth / 6 * 5;
+          break;
+      }
+
+      final brick = Brick(
+          key.toUpperCase(), pos, x, 0, screenWidth / 6, 20, Colors.white);
       _allBricks.add(brick);
     }
   }
 
-  Widget buildBodies() {
+  Widget _buildBodies() {
     if (stage == 'pick_song') {
       return Center(
         child: Text('Pick a song =>',
@@ -219,24 +256,24 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
     } else {
       return Column(
         children: [
-          Expanded(child: buildPainter()),
-          buildKeyboard(),
-          buildBottom(),
+          Expanded(child: _buildPainter()),
+          _buildKeyboard(),
+          _buildBottom(),
         ],
       );
     }
   }
 
-  Widget buildKeyboard() {
+  Widget _buildKeyboard() {
     return Row(
       children: List.generate(
-        6,
+        availableKeys.length,
         (index) => Expanded(
           child: Container(
-            color: keysAndColors[index]['color'],
+            color: Colors.transparent,
             child: Center(
               child: Text(
-                keysAndColors[index]['key'],
+                availableKeys[index].keyLabel,
                 style: TextStyle(
                     fontFamily: "Roboto",
                     fontSize: _screenWidth * 0.03,
@@ -249,78 +286,90 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
     );
   }
 
-  Widget buildPainter() {
-    /// Use AnimatedBuilder to update the painter in 60 fps:
+  Widget _buildPainter() {
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        /// Extract bricks that should be drawn base on music position:
-        /// Then remove the extracted bricks from allBrick list.
-        int counter = 0;
-        for (var item in _allBricks) {
-          int position = item.position;
-          int currentPos = _player.position.position!.inMilliseconds;
-
-          if (position - currentPos <= item.fallTime) {
-            _drawingBricks.add(item);
-            counter += 1;
-          }
-        }
-        _allBricks.removeRange(0, counter);
-
-        /// Remove bricks that are out of screen:
-        counter = 0;
-        for (var item in _drawingBricks) {
-          if (item.isOutOfScreen) counter += 1;
-        }
-        _drawingBricks.removeRange(0, counter);
-
-        return CustomPaint(
-          painter: BrickPainter(_drawingBricks),
-          child: child,
+        return Stack(
+          children: [
+            Container(
+              constraints: BoxConstraints.expand(),
+              color: Colors.grey[800],
+            ),
+            ..._updateDrawingBricks(),
+            Positioned(
+              bottom: _screenHeight * 0.05,
+              child: Container(
+                color: Colors.redAccent,
+                height: 10,
+                width: _screenWidth,
+              ),
+            ),
+          ],
         );
       },
-      child: Container(constraints: BoxConstraints.expand()),
     );
   }
 
-  Widget buildBottom() {
+  List<Widget> _updateDrawingBricks() {
+    /// Extract bricks that should be drawn base on music position:
+    /// Then remove the extracted bricks from allBrick list.
+    int counter = 0;
+    for (var brick in _allBricks) {
+      int position = brick.position;
+      int currentPos = _player.position.position!.inMilliseconds;
+
+      if (position - currentPos <= brick.fallTime) {
+        _drawingBricks.add(brick);
+        counter += 1;
+      }
+    }
+    _allBricks.removeRange(0, counter);
+
+    /// Remove bricks that are out of screen:
+    counter = 0;
+    for (var item in _drawingBricks) {
+      if (item.isOutOfScreen) counter += 1;
+    }
+    _drawingBricks.removeRange(0, counter);
+
+    /// Make bricks fall:
+    for (var brick in _drawingBricks) {
+      brick.fallTo(_screenHeight * 0.95);
+    }
+
+    return List.generate(
+      _drawingBricks.length,
+      (index) => Positioned(
+        left: _drawingBricks[index].x,
+        top: _drawingBricks[index].y - _drawingBricks[index].height,
+        child: _drawingBricks[index],
+      ),
+    );
+  }
+
+  Widget _buildBottom() {
     return Row(
       children: [
         Expanded(
             flex: 1,
-            child: IconButton(
+            child: TextButton(
               onPressed: () {
                 if (_player.playback.isPlaying) {
                   _player.seek(Duration(milliseconds: 0));
                   _player.pause();
                   setState(() {});
                 } else {
-                  prepareBricks(_screenWidth);
+                  _prepareAllBricks(_screenWidth);
                   _countdownEndTime = DateTime.now().millisecondsSinceEpoch +
                       _countdownInterval;
                   setState(() => stage = stageCountdown);
                 }
               },
-              icon: _player.playback.isPlaying
+              child: _player.playback.isPlaying
                   ? Icon(Icons.replay)
                   : Icon(Icons.play_arrow),
             )),
-        Expanded(
-          flex: 15,
-          child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, child) {
-                double value = _player.position.position!.inMilliseconds /
-                    _player.position.duration!.inMilliseconds;
-
-                if (_player.position.position != null && !value.isNaN) {
-                  return LinearProgressIndicator(value: value);
-                } else {
-                  return LinearProgressIndicator(value: 0);
-                }
-              }),
-        ),
         Expanded(
             flex: 1,
             child: Center(
@@ -332,8 +381,11 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
                       final position = snapshot.data!.position!.inMilliseconds;
                       String elapsed = df.format(
                           DateTime.fromMillisecondsSinceEpoch(position));
+                      String total = df.format(
+                          DateTime.fromMillisecondsSinceEpoch(
+                              _player.position.duration!.inMilliseconds));
 
-                      return Text(elapsed);
+                      return Text('$elapsed/$total');
                     } else {
                       return Text('0:00');
                     }
@@ -341,12 +393,12 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
             )),
         Expanded(
           flex: 1,
-          child: IconButton(
+          child: TextButton(
             onPressed: () => setState(() {
               _mute = !_mute;
               _mute ? _player.setVolume(0) : _player.setVolume(_volume);
             }),
-            icon: Icon(_mute ? Icons.volume_off_sharp : Icons.volume_up_sharp),
+            child: Icon(_mute ? Icons.volume_off_sharp : Icons.volume_up_sharp),
           ),
         ),
       ],
