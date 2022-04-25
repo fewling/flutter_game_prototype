@@ -40,7 +40,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
   final String stageGame = "game";
 
   int _countdownEndTime = 0;
-  final int _countdownInterval = 1000;
+  final int _countdownInterval = 3000;
 
   double _screenWidth = 0;
   double _screenHeight = 0;
