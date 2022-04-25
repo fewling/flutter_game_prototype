@@ -40,6 +40,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
   final int _countdownInterval = 5000;
 
   double _screenWidth = 0;
+  double _screenHeight = 0;
 
   @override
   void initState() {
@@ -56,6 +57,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     _screenWidth = MediaQuery.of(context).size.width;
+    _screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
       appBar: buildAppbar(),
@@ -196,9 +198,12 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
   }
 
   Widget buildPainter() {
+    /// Use AnimatedBuilder to update the painter in 60 fps:
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
+        /// Extract bricks that should be drawn base on music position:
+        /// Then remove the extracted bricks from allBrick list.
         int counter = 0;
         for (var item in _allBricks) {
           int position = item.position;
@@ -209,8 +214,16 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
             counter += 1;
           }
         }
-
         _allBricks.removeRange(0, counter);
+
+        /// Remove bricks that are out of screen:
+        counter = 0;
+        for (var item in _drawingBricks) {
+          if (item.y > _screenHeight) {
+            counter += 1;
+          }
+        }
+        _drawingBricks.removeRange(0, counter);
 
         return CustomPaint(
           painter: BrickPainter(_drawingBricks),
