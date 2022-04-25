@@ -3,7 +3,7 @@
 import 'package:dart_vlc/dart_vlc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_game_prototype/beats_recorder.dart';
-import 'package:flutter_game_prototype/game.dart';
+import 'package:flutter_game_prototype/game/game.dart';
 
 void main() {
   DartVLC.initialize();
