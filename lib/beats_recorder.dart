@@ -54,6 +54,8 @@ class _BeatRecorderState extends State<BeatRecorder> {
   final StreamController<Map<Duration, String>> _keyStreamController =
       StreamController();
 
+  Future<int>? _processExitCodeFuture;
+
   @override
   void initState() {
     super.initState();
@@ -120,7 +122,19 @@ class _BeatRecorderState extends State<BeatRecorder> {
           child: Column(
             children: [
               Flexible(child: buildPlaylist()),
-              buildPressedKeyList(context),
+              // buildPressedKeyList(context),
+              _processExitCodeFuture == null
+                  ? Container()
+                  : FutureBuilder<int>(
+                      future: _processExitCodeFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.done) {
+                          return Text(snapshot.data.toString());
+                        } else {
+                          return CircularProgressIndicator();
+                        }
+                      },
+                    ),
               RepaintBoundary(child: buildPlaybackButtons()),
               RepaintBoundary(child: buildProgressBar()),
             ],
@@ -160,10 +174,14 @@ class _BeatRecorderState extends State<BeatRecorder> {
             tileColor: playingFile == soundFilesPaths[index]
                 ? Colors.green
                 : Colors.transparent,
-            onTap: () {
+            onTap: () async {
               playingFile = soundFilesPaths[index];
 
               File file = File(soundFilesPaths[index]);
+
+              Process.start('python3', ['main.py', file.path])
+                  .then((value) => _processExitCodeFuture = value.exitCode);
+
               Media media0 = Media.file(file);
               _player.open(media0);
               _player.play();
