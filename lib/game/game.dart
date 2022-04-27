@@ -65,7 +65,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
   } as LinkedHashMap<String, int>;
 
   final double gravity = 0.1;
-  final double boost = 0.8;
+  final double accelerate = 0.5;
   final Map<String, double> _keyVelocities = {
     "A": -0.1,
     "S": -0.1,
@@ -95,6 +95,25 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
     _player.playbackStream.listen((event) {
       if (event.isCompleted) {
         // TODO: handle end of level
+
+        scores.forEach((key, _) => scores[key] = 0);
+
+        showDialog(
+            context: context,
+            builder: (context) {
+              return AlertDialog(
+                title: Text("Song completed!"),
+                content: Text(scores.toString()),
+                actions: <Widget>[
+                  TextButton(
+                    child: Text("OK"),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ],
+              );
+            });
       }
     });
 
@@ -114,18 +133,19 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
         for (var keyboardKey in availableKeys) {
           if (keyEvent.isKeyPressed(keyboardKey)) {
             String label = keyboardKey.keyLabel.toUpperCase();
-            _keyVelocities[label] = _keyVelocities[label]! + boost;
+            _keyVelocities[label] = _keyVelocities[label]! + accelerate;
 
-            print(_keyVelocities);
             for (var i = 0; i < _drawingBricks.length; i++) {
               Brick brick = _drawingBricks[i];
 
               if (brick.content == label) {
                 double remainedDist = brick.remainingDist() / brick.totalDist;
 
-                if (remainedDist >= 0.08 && remainedDist <= 0.2) {
+                print(remainedDist);
+
+                if (remainedDist <= 0.3) {
                   scores['perfect'] = scores['perfect']! + 1;
-                } else if (remainedDist > 0.2 && remainedDist <= 0.3) {
+                } else if (remainedDist <= 0.5) {
                   scores['good'] = scores['good']! + 1;
                 } else {
                   scores['bad'] = scores['bad']! + 1;
