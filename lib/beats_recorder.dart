@@ -129,7 +129,9 @@ class _BeatRecorderState extends State<BeatRecorder> {
                       future: _processExitCodeFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.done) {
-                          return Text(snapshot.data.toString());
+                          return snapshot.data == 0
+                              ? Text('Success')
+                              : Text('Error');
                         } else {
                           return CircularProgressIndicator();
                         }
@@ -179,7 +181,7 @@ class _BeatRecorderState extends State<BeatRecorder> {
 
               File file = File(soundFilesPaths[index]);
 
-              Process.start('python3', ['main.py', file.path])
+              Process.start('.\\main.exe', [file.path, _savesDirectory!])
                   .then((value) => _processExitCodeFuture = value.exitCode);
 
               Media media0 = Media.file(file);
