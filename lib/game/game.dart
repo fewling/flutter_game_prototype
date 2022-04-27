@@ -96,8 +96,6 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
       if (event.isCompleted) {
         // TODO: handle end of level
 
-        scores.forEach((key, _) => scores[key] = 0);
-
         showDialog(
             context: context,
             builder: (context) {
@@ -108,6 +106,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
                   TextButton(
                     child: Text("OK"),
                     onPressed: () {
+                      scores.forEach((key, _) => scores[key] = 0);
                       Navigator.of(context).pop();
                     },
                   ),
