@@ -1,61 +1,44 @@
-// ignore_for_file: prefer_const_constructors, prefer_const_literals_to_create_immutables
-
 import 'dart:collection';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:dart_vlc/dart_vlc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_countdown_timer/flutter_countdown_timer.dart';
+import 'package:flutter_game_prototype/game/brick.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 
-import 'brick.dart';
+class NewGameScreen extends StatefulWidget {
+  final File musicFile;
+  final List<Brick> allBricks;
 
-class Game extends StatefulWidget {
-  const Game({Key? key}) : super(key: key);
+  const NewGameScreen(this.allBricks, this.musicFile, {Key? key})
+      : super(key: key);
 
   @override
-  State<Game> createState() => _GameState();
+  State<NewGameScreen> createState() => _NewGameScreenState();
 }
 
-class _GameState extends State<Game> with SingleTickerProviderStateMixin {
-  late Future<Directory> _savesDirFuture;
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+class _NewGameScreenState extends State<NewGameScreen>
+    with SingleTickerProviderStateMixin {
+  late List<Brick> _allBricks;
 
-  final Player _player = Player(id: 69420);
+  final FocusNode _focusNode = FocusNode();
 
-  Map<String, dynamic> _selectedJson = {};
-  final double _volume = 0.3;
+  final Player _player = Player(id: 123);
+  final double _volume = 0.2;
   bool _mute = false;
 
-  final List<Brick> _allBricks = [];
-  final List<Brick> _drawingBricks = [];
-
-  late AnimationController _controller;
-
-  String stage = "pick_song";
-  final String stageReady = "ready";
+  late String stage;
   final String stageCountdown = "countdown";
-  final String stageGame = "game";
+  final String stageStart = "game";
 
   int _countdownEndTime = 0;
   final int _countdownInterval = 3000;
 
-  double _screenWidth = 0;
-  double _screenHeight = 0;
+  late AnimationController _controller;
 
-  final List<LogicalKeyboardKey> availableKeys = [
-    LogicalKeyboardKey.keyA,
-    LogicalKeyboardKey.keyS,
-    LogicalKeyboardKey.keyD,
-    LogicalKeyboardKey.keyJ,
-    LogicalKeyboardKey.keyK,
-    LogicalKeyboardKey.keyL,
-  ];
-
-  final FocusNode _focusNode = FocusNode();
+  final List<Brick> _drawingBricks = [];
 
   final LinkedHashMap<String, int> scores = {
     "perfect": 0,
@@ -83,36 +66,59 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
     "L": 0,
   };
 
+  final List<LogicalKeyboardKey> availableKeys = [
+    LogicalKeyboardKey.keyA,
+    LogicalKeyboardKey.keyS,
+    LogicalKeyboardKey.keyD,
+    LogicalKeyboardKey.keyJ,
+    LogicalKeyboardKey.keyK,
+    LogicalKeyboardKey.keyL,
+  ];
+
+  bool _levelCompleted = false;
+  bool _isPlaying = false;
+
   @override
   void initState() {
+    _allBricks = cloneAllBricks();
+    stage = stageCountdown;
+
     _controller =
-        AnimationController(vsync: this, duration: Duration(seconds: 1));
+        AnimationController(vsync: this, duration: const Duration(seconds: 1));
     _controller.repeat();
 
+    _countdownEndTime =
+        DateTime.now().millisecondsSinceEpoch + _countdownInterval;
+
+    Media media = Media.file(widget.musicFile);
+    _player.open(media, autoStart: false);
     _player.setVolume(_volume);
-    _savesDirFuture = getApplicationDocumentsDirectory();
-
     _player.playbackStream.listen((event) {
-      if (event.isCompleted) {
-        // TODO: handle end of level
+      setState(() => _isPlaying = event.isPlaying);
 
-        showDialog(
-            context: context,
-            builder: (context) {
-              return AlertDialog(
-                title: Text("Song completed!"),
-                content: Text(scores.toString()),
-                actions: <Widget>[
-                  TextButton(
-                    child: Text("OK"),
-                    onPressed: () {
-                      scores.forEach((key, _) => scores[key] = 0);
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                ],
-              );
-            });
+      if (event.isCompleted) {
+        if (!_levelCompleted) {
+          _levelCompleted = true;
+
+          showDialog(
+              context: context,
+              builder: (context) {
+                return AlertDialog(
+                  title: const Text("Song completed!"),
+                  content: Text(scores.toString()),
+                  actions: <Widget>[
+                    TextButton(
+                      child: const Text("OK"),
+                      onPressed: () {
+                        scores.forEach((key, _) => scores[key] = 0);
+                        _levelCompleted = false;
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ],
+                );
+              });
+        }
       }
     });
 
@@ -120,15 +126,27 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
   }
 
   @override
+  void dispose() {
+    _controller.dispose();
+    _player.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    _screenWidth = MediaQuery.of(context).size.width;
-    _screenHeight = MediaQuery.of(context).size.height;
+    double screenWidth = MediaQuery.of(context).size.width;
+    double screenHeight = MediaQuery.of(context).size.height;
     _focusNode.requestFocus();
 
     return RawKeyboardListener(
       focusNode: _focusNode,
       autofocus: true,
       onKey: (keyEvent) {
+        if (keyEvent.logicalKey == LogicalKeyboardKey.escape) {
+          Navigator.of(context).pop();
+        }
+
         for (var keyboardKey in availableKeys) {
           if (keyEvent.isKeyPressed(keyboardKey)) {
             String label = keyboardKey.keyLabel.toUpperCase();
@@ -158,176 +176,120 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
         }
       },
       child: Scaffold(
-        key: _scaffoldKey,
-        appBar: _buildAppbar(),
-        endDrawer: _buildEndDrawer(_screenWidth),
-        body: _buildBodies(),
+        body: stage == stageCountdown
+            ? CountdownTimer(
+                endTime: _countdownEndTime,
+                onEnd: () {
+                  setState(() => stage = stageStart);
+                  _player.play();
+                },
+                widgetBuilder: (_, remainingTime) => Center(
+                  child: Text(
+                    remainingTime!.sec.toString(),
+                    style: Theme.of(context).textTheme.headline1,
+                  ),
+                ),
+              )
+            : Column(
+                children: [
+                  Expanded(child: _buildGame(screenWidth, screenHeight)),
+                  _buildKeyboard(screenWidth),
+                  const SizedBox(height: 20),
+                  _buildBottom(),
+                ],
+              ),
       ),
     );
   }
 
-  @override
-  void dispose() {
-    _player.dispose();
-    _controller.dispose();
-    super.dispose();
-  }
+  Widget _buildGame(double screenWidth, double screenHeight) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            ..._buildFallingBricks(screenHeight),
 
-  PreferredSizeWidget _buildAppbar() {
-    return AppBar(
-      leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.arrow_back_ios_new_outlined)),
-      actions: [
-        IconButton(
-          icon: Icon(Icons.playlist_play_sharp),
-          onPressed: () => _scaffoldKey.currentState!.openEndDrawer(),
-        ),
-      ],
+            /// Draw the detination line indicator:
+            Positioned(
+              bottom: screenHeight * 0.05,
+              child: Container(
+                color: Colors.redAccent,
+                height: 10,
+                width: screenWidth,
+              ),
+            ),
+
+            /// Draw the score:
+            Positioned(
+              top: screenHeight * 0.02,
+              right: screenWidth * 0.02,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: List.generate(
+                  scores.length,
+                  (index) {
+                    String key = scores.keys.elementAt(index);
+                    return Row(
+                      children: [
+                        Text("$key x "),
+                        const SizedBox(width: 5),
+                        Text(scores[key].toString()),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Drawer _buildEndDrawer(double screenWidth) {
-    return Drawer(
-      child: FutureBuilder<Directory>(
-          future: _savesDirFuture,
-          builder: (context, snapshot) {
-            if (snapshot.hasData) {
-              Directory appDocDir = snapshot.data!;
-              String appDocPath = appDocDir.path;
+  List<Widget> _buildFallingBricks(double screenHeight) {
+    /// Extract bricks that should be drawn base on music position:
+    /// Then remove the extracted bricks from allBrick list.
+    int counter = 0;
+    for (var brick in _allBricks) {
+      int position = brick.position;
+      int currentPos = _player.position.position!.inMilliseconds;
 
-              String savesDirectory = Platform.isWindows
-                  ? "$appDocPath\\flutter_game_prototype"
-                  : "$appDocPath/flutter_game_prototype";
-
-              Directory directory = Directory(savesDirectory);
-
-              List<FileSystemEntity> fileEntities =
-                  directory.listSync(recursive: true);
-
-              return ListView.builder(
-                itemCount: fileEntities.length,
-                itemBuilder: (context, index) {
-                  File entity = fileEntities[index] as File;
-
-                  String content = entity.readAsStringSync();
-                  Map<String, dynamic> json = jsonDecode(content);
-
-                  String filePath = json['file'];
-                  String fileName = Platform.isWindows
-                      ? filePath.split('\\').last
-                      : filePath.split('/').last;
-
-                  return ListTile(
-                    title: Text(
-                      fileName,
-                      style: TextStyle(fontFamily: "Roboto"),
-                    ),
-                    onTap: () {
-                      /// update states:
-                      stage = stageReady;
-                      _selectedJson = json;
-                      setState(() {});
-
-                      _prepareAllBricks(screenWidth);
-
-                      /// Load music:
-                      File file = File(filePath);
-                      Media media = Media.file(file);
-                      _player.open(media, autoStart: false);
-
-                      /// Close the drawer:
-                      Navigator.pop(context);
-                    },
-                  );
-                },
-              );
-            } else {
-              return Center(child: CircularProgressIndicator());
-            }
-          }),
-    );
-  }
-
-  void _prepareAllBricks(double screenWidth) {
-    _allBricks.clear();
-    List pressedKeys = _selectedJson['pressed_keys'];
-    for (var item in pressedKeys) {
-      String key = item.keys.first;
-      int pos = item.values.first;
-
-      double x = 0;
-      switch (key) {
-        case 'A':
-          x = 0;
-          break;
-        case 'S':
-          x = _screenWidth / 6;
-          break;
-        case 'D':
-          x = _screenWidth / 6 * 2;
-          break;
-        case 'J':
-          x = _screenWidth / 6 * 3;
-          break;
-        case 'K':
-          x = _screenWidth / 6 * 4;
-          break;
-        case 'L':
-          x = _screenWidth / 6 * 5;
-          break;
+      if (position - currentPos <= brick.fallTime) {
+        _drawingBricks.add(brick);
+        counter += 1;
       }
-
-      final brick = Brick(
-          key.toUpperCase(), pos, x, 0, screenWidth / 6, 20, Colors.white);
-      _allBricks.add(brick);
     }
+    _allBricks.removeRange(0, counter);
+
+    /// Remove bricks that are out of screen:
+    List<Brick> bricksToRemove = [];
+    for (var item in _drawingBricks) {
+      if (item.isOutOfScreen) {
+        bricksToRemove.add(item);
+        scores['missed'] = scores['missed']! + 1;
+      }
+    }
+    for (var element in bricksToRemove) {
+      _drawingBricks.remove(element);
+    }
+
+    /// Make bricks fall:
+    for (var brick in _drawingBricks) {
+      brick.fallTo(screenHeight * 0.95);
+    }
+
+    return List.generate(
+      _drawingBricks.length,
+      (index) => Positioned(
+        left: _drawingBricks[index].x,
+        top: _drawingBricks[index].y - _drawingBricks[index].height,
+        child: _drawingBricks[index],
+      ),
+    );
   }
 
-  Widget _buildBodies() {
-    if (stage == 'pick_song') {
-      return Center(
-        child: Text('Pick a song =>',
-            style: Theme.of(context).textTheme.headline1),
-      );
-    } else if (stage == stageReady) {
-      return Center(
-        child: TextButton(
-          onPressed: () => setState(() {
-            stage = stageCountdown;
-            _countdownEndTime =
-                DateTime.now().millisecondsSinceEpoch + _countdownInterval;
-          }),
-          child: Text('Start?', style: Theme.of(context).textTheme.headline1),
-        ),
-      );
-    } else if (stage == stageCountdown) {
-      return CountdownTimer(
-        endTime: _countdownEndTime,
-        onEnd: () {
-          setState(() => stage = "game");
-          _player.play();
-        },
-        widgetBuilder: (_, remainingTime) => Center(
-          child: Text(
-            remainingTime!.sec.toString(),
-            style: Theme.of(context).textTheme.headline1,
-          ),
-        ),
-      );
-    } else {
-      return Column(
-        children: [
-          Expanded(child: _buildGame()),
-          _buildKeyboard(),
-          SizedBox(height: 20),
-          _buildBottom(),
-        ],
-      );
-    }
-  }
-
-  Widget _buildKeyboard() {
+  Widget _buildKeyboard(double screenWidth) {
     return AnimatedBuilder(
         animation: _controller,
         builder: (context, child) {
@@ -369,7 +331,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
                       child: Text(
                         availableKeys[index].keyLabel,
                         style: TextStyle(
-                            fontSize: _screenWidth * 0.03, color: Colors.white),
+                            fontSize: screenWidth * 0.03, color: Colors.white),
                       ),
                     ),
                   ),
@@ -380,93 +342,6 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
         });
   }
 
-  Widget _buildGame() {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Stack(
-          children: [
-            ..._buildFallingBricks(),
-
-            /// Draw the detination line indicator:
-            Positioned(
-              bottom: _screenHeight * 0.05,
-              child: Container(
-                color: Colors.redAccent,
-                height: 10,
-                width: _screenWidth,
-              ),
-            ),
-
-            /// Draw the score:
-            Positioned(
-              top: _screenHeight * 0.02,
-              right: _screenWidth * 0.02,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: List.generate(
-                  scores.length,
-                  (index) {
-                    String key = scores.keys.elementAt(index);
-                    return Row(
-                      children: [
-                        Text("$key x "),
-                        SizedBox(width: 5),
-                        Text(scores[key].toString()),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  List<Widget> _buildFallingBricks() {
-    /// Extract bricks that should be drawn base on music position:
-    /// Then remove the extracted bricks from allBrick list.
-    int counter = 0;
-    for (var brick in _allBricks) {
-      int position = brick.position;
-      int currentPos = _player.position.position!.inMilliseconds;
-
-      if (position - currentPos <= brick.fallTime) {
-        _drawingBricks.add(brick);
-        counter += 1;
-      }
-    }
-    _allBricks.removeRange(0, counter);
-
-    /// Remove bricks that are out of screen:
-    List<Brick> bricksToRemove = [];
-    for (var item in _drawingBricks) {
-      if (item.isOutOfScreen) {
-        bricksToRemove.add(item);
-        scores['missed'] = scores['missed']! + 1;
-      }
-    }
-    for (var element in bricksToRemove) {
-      _drawingBricks.remove(element);
-    }
-
-    /// Make bricks fall:
-    for (var brick in _drawingBricks) {
-      brick.fallTo(_screenHeight * 0.95);
-    }
-
-    return List.generate(
-      _drawingBricks.length,
-      (index) => Positioned(
-        left: _drawingBricks[index].x,
-        top: _drawingBricks[index].y - _drawingBricks[index].height,
-        child: _drawingBricks[index],
-      ),
-    );
-  }
-
   Widget _buildBottom() {
     return Row(
       children: [
@@ -474,20 +349,27 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
             flex: 1,
             child: TextButton(
               onPressed: () {
-                if (_player.playback.isPlaying) {
-                  _player.seek(Duration(milliseconds: 0));
+                if (_isPlaying) {
+                  _player.seek(const Duration(milliseconds: 0));
                   _player.pause();
+
                   setState(() {});
                 } else {
-                  _prepareAllBricks(_screenWidth);
+                  _allBricks = cloneAllBricks();
+
                   _countdownEndTime = DateTime.now().millisecondsSinceEpoch +
                       _countdownInterval;
-                  setState(() => stage = stageCountdown);
+
+                  scores.forEach((key, _) => scores[key] = 0);
+
+                  stage = stageCountdown;
+
+                  setState(() {});
                 }
               },
-              child: _player.playback.isPlaying
-                  ? Icon(Icons.replay)
-                  : Icon(Icons.play_arrow),
+              child: _isPlaying
+                  ? const Icon(Icons.replay)
+                  : const Icon(Icons.play_arrow),
               style: TextButton.styleFrom(primary: Colors.white),
             )),
         Expanded(
@@ -507,7 +389,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
 
                       return Text('$elapsed/$total');
                     } else {
-                      return Text('0:00');
+                      return const Text('0:00');
                     }
                   }),
             )),
@@ -524,5 +406,22 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
         ),
       ],
     );
+  }
+
+  List<Brick> cloneAllBricks() {
+    final List<Brick> bricks = [];
+    for (var brick in widget.allBricks) {
+      final b = Brick(
+        brick.content,
+        brick.position,
+        brick.x,
+        brick.y,
+        brick.width,
+        brick.height,
+        brick.color,
+      );
+      bricks.add(b);
+    }
+    return bricks;
   }
 }

@@ -22,7 +22,7 @@ class _BeatRecorderState extends State<BeatRecorder> {
   String? _savesDirectory;
 
   List<String> soundFilesPaths = [];
-  List<String> supportedFormat = ['mp3', 'wav', 'flac', 'ogg', 'm4a'];
+  List<String> supportedFormat = ['wav', 'flac', 'ogg', 'm4a'];
 
   final Player _player = Player(id: 69420);
   String playingFile = '';
@@ -77,30 +77,18 @@ class _BeatRecorderState extends State<BeatRecorder> {
 
   @override
   Widget build(BuildContext context) {
-    if (soundFilesPaths.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: Text('Beats Maker')),
-        body: Center(
-          child: OutlinedButton(
-            onPressed: () => pickMusicFolder(),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(width: 5.0, color: Colors.teal),
-            ),
-            child: Text(
-              "Pick a music folder",
-              style: Theme.of(context).textTheme.headline1,
-            ),
-          ),
-        ),
-      );
-    }
+    keyAreaFocusNode.requestFocus();
 
     return Scaffold(
-      appBar: AppBar(title: Text('Beats Maker')),
       body: RawKeyboardListener(
         focusNode: keyAreaFocusNode,
         autofocus: true,
         onKey: (rawkeyEvent) {
+          // pop screen if pressed esc key
+          if (rawkeyEvent.logicalKey == LogicalKeyboardKey.escape) {
+            Navigator.pop(context, true);
+          }
+
           if (_player.playback.isPlaying) {
             for (var keyboardKey in availableKeys) {
               if (rawkeyEvent.isKeyPressed(keyboardKey)) {
@@ -117,31 +105,45 @@ class _BeatRecorderState extends State<BeatRecorder> {
             }
           }
         },
-        child: GestureDetector(
-          onTap: () => keyAreaFocusNode.requestFocus(),
-          child: Column(
-            children: [
-              Flexible(child: buildPlaylist()),
-              // buildPressedKeyList(context),
-              _processExitCodeFuture == null
-                  ? Container()
-                  : FutureBuilder<int>(
-                      future: _processExitCodeFuture,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.done) {
-                          return snapshot.data == 0
-                              ? Text('Success')
-                              : Text('Error');
-                        } else {
-                          return CircularProgressIndicator();
-                        }
-                      },
-                    ),
-              RepaintBoundary(child: buildPlaybackButtons()),
-              RepaintBoundary(child: buildProgressBar()),
-            ],
-          ),
-        ),
+        child: soundFilesPaths.isEmpty
+            ? Center(
+                child: OutlinedButton(
+                  onPressed: () => pickMusicFolder(),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(width: 5.0, color: Colors.teal),
+                  ),
+                  child: Text(
+                    "Pick a music folder",
+                    style: Theme.of(context).textTheme.headline1,
+                  ),
+                ),
+              )
+            : GestureDetector(
+                onTap: () => keyAreaFocusNode.requestFocus(),
+                child: Column(
+                  children: [
+                    Flexible(child: buildPlaylist()),
+                    // buildPressedKeyList(context),
+                    _processExitCodeFuture == null
+                        ? Container()
+                        : FutureBuilder<int>(
+                            future: _processExitCodeFuture,
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.done) {
+                                return snapshot.data == 0
+                                    ? Text('Success')
+                                    : Text('Error');
+                              } else {
+                                return CircularProgressIndicator();
+                              }
+                            },
+                          ),
+                    RepaintBoundary(child: buildPlaybackButtons()),
+                    RepaintBoundary(child: buildProgressBar()),
+                  ],
+                ),
+              ),
       ),
       floatingActionButton: FloatingActionButton(
         child: Icon(Icons.clear),
