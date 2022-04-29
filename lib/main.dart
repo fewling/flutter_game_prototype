@@ -2,6 +2,7 @@
 
 import 'package:dart_vlc/dart_vlc.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_game_prototype/beats_recorder.dart';
 import 'package:flutter_game_prototype/select_level_page.dart';
 
 void main() {
@@ -62,6 +63,22 @@ class Home extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (context) => SelectLevelPage(),
+                      ),
+                    );
+                  },
+                ),
+                TextButton(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text('Create',
+                        style: Theme.of(context).textTheme.headline2),
+                  ),
+                  style: menuButtonStyle,
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => BeatRecorder(),
                       ),
                     );
                   },

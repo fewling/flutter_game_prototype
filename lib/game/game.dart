@@ -26,7 +26,7 @@ class _NewGameScreenState extends State<NewGameScreen>
   final FocusNode _focusNode = FocusNode();
 
   final Player _player = Player(id: 123);
-  final double _volume = 0.2;
+  double _volume = 0.3;
   bool _mute = false;
 
   late String stage;
@@ -74,6 +74,7 @@ class _NewGameScreenState extends State<NewGameScreen>
     LogicalKeyboardKey.keyK,
     LogicalKeyboardKey.keyL,
   ];
+  final Set<LogicalKeyboardKey> pressedKeys = {};
 
   bool _levelCompleted = false;
   bool _isPlaying = false;
@@ -138,6 +139,7 @@ class _NewGameScreenState extends State<NewGameScreen>
     double screenWidth = MediaQuery.of(context).size.width;
     double screenHeight = MediaQuery.of(context).size.height;
     _focusNode.requestFocus();
+    _player.setVolume(_volume);
 
     return RawKeyboardListener(
       focusNode: _focusNode,
@@ -147,8 +149,16 @@ class _NewGameScreenState extends State<NewGameScreen>
           Navigator.of(context).pop();
         }
 
+        if (keyEvent is RawKeyUpEvent) {
+          if (pressedKeys.contains(keyEvent.logicalKey)) {
+            pressedKeys.remove(keyEvent.logicalKey);
+          }
+        }
+
         for (var keyboardKey in availableKeys) {
-          if (keyEvent.isKeyPressed(keyboardKey)) {
+          if (keyEvent.isKeyPressed(keyboardKey) &&
+              !pressedKeys.contains(keyboardKey)) {
+            pressedKeys.add(keyboardKey);
             String label = keyboardKey.keyLabel.toUpperCase();
             _keyVelocities[label] = _keyVelocities[label]! + accelerate;
 
