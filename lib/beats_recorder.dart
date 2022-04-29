@@ -8,7 +8,9 @@ import 'package:dart_vlc/dart_vlc.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_game_prototype/level_files_provider.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 
 class BeatRecorder extends StatefulWidget {
   const BeatRecorder({Key? key}) : super(key: key);
@@ -22,7 +24,7 @@ class _BeatRecorderState extends State<BeatRecorder> {
   String? _savesDirectory;
 
   List<String> soundFilesPaths = [];
-  List<String> supportedFormat = ['wav', 'flac', 'ogg', 'm4a'];
+  List<String> supportedFormat = ['mp3', 'wav', 'flac', 'ogg', 'm4a'];
 
   final Player _player = Player(id: 69420);
   String playingFile = '';

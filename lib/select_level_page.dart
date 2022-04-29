@@ -32,12 +32,30 @@ class _SelectLevelPageState extends State<SelectLevelPage> {
     String savesDirectory = "$appDocPath\\flutter_game_prototype";
     Directory directory = Directory(savesDirectory);
     _fileEntities = directory.listSync(recursive: true);
+
+    final List<FileSystemEntity> deleteFiles = [];
+
+    for (var item in _fileEntities!) {
+      if (item is File) {
+        if (!item.path.endsWith('.json')) {
+          deleteFiles.add(item);
+        }
+      }
+    }
+
+    for (var item in deleteFiles) {
+      _fileEntities!.remove(item);
+    }
+
     setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text('Select a level'),
+      ),
       body: buildBody(),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Navigator.pop(context),
@@ -84,8 +102,9 @@ class _SelectLevelPageState extends State<SelectLevelPage> {
     }
 
     return Scaffold(
-      body: ListView.builder(
+      body: ListView.separated(
         itemCount: _fileEntities!.length,
+        separatorBuilder: (context, index) => Divider(color: Colors.grey),
         itemBuilder: (context, index) {
           File entity = _fileEntities![index] as File;
 
@@ -101,10 +120,7 @@ class _SelectLevelPageState extends State<SelectLevelPage> {
             leading: Icon(Icons.music_note_outlined),
             title: Text(
               fileName,
-              style: TextStyle(
-                fontFamily: "Roboto",
-                fontSize: 36,
-              ),
+              style: TextStyle(fontFamily: "Roboto", fontSize: 24),
             ),
             onTap: () {
               final allBricks =
